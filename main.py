@@ -35,10 +35,19 @@ class Board:
 
 class Piece:
     def __init__(self, board_id, team, x, y) -> None:
-        self.board_id = board_id
-        self.team = team
-        self.x = x
-        self.y = y
+        self.properties = dict()
+        self.properties["board_id"] = board_id
+        self.properties["team"] = team
+        self.properties["x"] = x
+        self.properties["y"] = y
+
+    def get_properties(self, key):
+        if key in self.properties:
+            return self.properties[key]
+    
+    def set_properties(self, key, value):
+        if key in self.properties:
+            self.properties[key] = value
 
     def check_move(self, x2, y2):
         board = boards[self.board_id].board
@@ -47,7 +56,7 @@ class Piece:
         if x2 < 0 or x2 > board.w or x2 < 0 or y2 > board.h:
             return None
         
-        if new_cell is not None and new_cell.team == self.team:
+        if new_cell is not None and new_cell.team == self.properties["team"]:
             return None
         
         return [((self.x, self.y),(x2, y2))]
@@ -56,8 +65,8 @@ class Piece:
 class Pawn(Piece):
     def __init__(self, board_id, team, x, y) -> None:
         super().__init__(board_id, team, x, y)
-        self.moved = False
-        self.double_moved = False
+        self.properties["moved"] = False
+        self.prperties["double_moved"] = False
 
     def check_move(self, x2, y2):
         self_move = super().check_move(x2, y2)
