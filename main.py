@@ -39,9 +39,12 @@ class Board:
                     if isinstance(obj, tuple):
                         (x1, y1), (x2, y2) = obj
                         self.board[y2][x2] = self.board[y1][x1]
+                        self.board[y2][x2].x, self.board[y2][x2].y = x2, y2
                         self.board[y1][x1] = None
                     elif isinstance(obj, FunctionType):
                         obj()
+            else:
+                print("illegal move")
 
 
 class Piece:
@@ -51,6 +54,9 @@ class Piece:
         self.team = self.properties["team"] = team
         self.x = self.properties["x"] = x
         self.y = self.properties["y"] = y
+
+        self.board = boards[board_id]
+        self.board.board[y][x] = self
 
     def get_properties(self, **args):
         values = [self.properties[key] for key in args if key in self.properties]
@@ -62,10 +68,9 @@ class Piece:
                 self.properties[key] = value
 
     def check_move(self, x2, y2):
-        board = boards[self.board_id].board
-        new_cell = board[y2][x2]
+        new_cell = self.board.board[y2][x2]
 
-        if x2 < 0 or x2 > board.w or x2 < 0 or y2 > board.h:
+        if x2 < 0 or x2 > self.board.w or x2 < 0 or y2 > self.board.h:
             return None
         
         if new_cell is not None and new_cell.team == self.team:
@@ -74,7 +79,7 @@ class Piece:
         return [((self.x, self.y),(x2, y2))]
     
     def discard(self):
-        boards[self.board_id][self.y][self.x] = None
+        self.board.board[self.y][self.x] = None
 
 
 class Pawn(Piece):
@@ -83,6 +88,9 @@ class Pawn(Piece):
         self.moved = self.properties["moved"] = False
         self.double_moved = self.properties["double_moved"] = False
 
+    def __repr__(self):
+        return "p"
+
     def check_move(self, x2, y2):
         self_move = super().check_move(x2, y2)
         if self_move is None:
@@ -90,7 +98,7 @@ class Pawn(Piece):
 
         self_move = self_move[0]
         dx, dy = x2 - self.x, y2 - self.y
-        board = boards[self.board_id]
+        board = self.board.board
         new_cell = board[y2][x2]
 
         if dx == 0 and dy in (1, 2) and board[y2 - 1][x2] is None: # straight fd
@@ -112,13 +120,60 @@ class Pawn(Piece):
                                         nearby_cell.team != self.team and 
                                         nearby_cell.double_moved): # regular take or en passant (https://en.wikipedia.org/wiki/En_passant)  
                 if not self.moved:
-                    return [self_move, lambda: new_cell.discard(), lambda: self.set_properties(moved=True)]
+                    return [lambda: new_cell.discard(), self_move, lambda: self.set_properties(moved=True)]
                 if self.double_moved:
-                    return [self_move, lambda: new_cell.discard(), lambda: self.set_properties(double_moved=False)]
-                return [self_move, lambda: new_cell.discard()]
+                    return [lambda: new_cell.discard(), self_move, lambda: self.set_properties(double_moved=False)]
+                return [lambda: new_cell.discard(), self_move]
                    
         return None
 
 
+class Bishop(Piece):
+
+    def __init__(self, board_id, team, x, y) -> None:
+        super().__init__(board_id, team, x, y)
+
+    def __repr__(self):
+        return "b"
+
+    def check_move(self, x2, y2):
+        self_move = super().check_move(x2, y2)
+        if self_move is None:
+            return None
+        
+        self_move = self_move[0]
+
+        dx = x2 - self.x
+        dy = y2 - self.y
+        if abs(dx) == abs(dy):
+            sx = dx // abs(dx)
+            sy = dy // abs(dy)
+
+            for d in range(1, abs(dx)):
+                print(f"checking: ({self.y + d * sy}, {self.x + d * sx}) -> {self.board.board[self.y + d * sy][self.x + d * sx]}")
+                if self.board.board[self.y + d * sy][self.x + d * sx] is not None:
+                    return None
+                
+            new_cell = self.board.board[y2][x2]
+            if new_cell is not None:
+                return [lambda: new_cell.discard(), self_move]
+            
+            return [self_move]
+          
+        return None
+
+
+# class Knight(Piece):
+#     def __init__(self, board_id, team, x, y) -> None:
+#         super().__init__(board_id, team, x, y)
+
 if __name__ == "__main__":
     board = Board()
+    Pawn(0, "black", 7, 7)
+    Bishop(0, "white", 0, 0)
+
+    while True:
+        for rank in board.board:
+            print(rank)
+        x1, y1, x2, y2 = (int(i) for i in input("x1 y1 x2 y2:").split())
+        board.make_move("white", x1, y1, x2, y2)
