@@ -1,9 +1,12 @@
+from types import FunctionType
+
+
 max_id = -1
 boards = []
 
 
 class Board:
-    def __init__(self, id, w=8, h=8) -> None:
+    def __init__(self, w=8, h=8) -> None:
         global max_id
         max_id += 1
         self.id = max_id
@@ -29,25 +32,34 @@ class Board:
 
     def make_move(self, team, x1, y1, x2, y2):
         piece = self.board[y1][x1]
-        if piece.team == team and piece.check_move(x2, y2):
-            pass
+        if piece is not None and piece.team == team:
+            result = piece.check_move(x2, y2)
+            if result is not None:
+                for obj in result:
+                    if isinstance(obj, tuple):
+                        (x1, y1), (x2, y2) = obj
+                        self.board[y2][x2] = self.board[y1][x1]
+                        self.board[y1][x1] = None
+                    elif isinstance(obj, FunctionType):
+                        obj()
 
 
 class Piece:
     def __init__(self, board_id, team, x, y) -> None:
         self.properties = dict()
-        self.properties["board_id"] = board_id
-        self.properties["team"] = team
-        self.properties["x"] = x
-        self.properties["y"] = y
+        self.board_id = self.properties["board_id"] = board_id
+        self.team = self.properties["team"] = team
+        self.x = self.properties["x"] = x
+        self.y = self.properties["y"] = y
 
-    def get_properties(self, key):
-        if key in self.properties:
-            return self.properties[key]
+    def get_properties(self, **args):
+        values = [self.properties[key] for key in args if key in self.properties]
+        return values
     
-    def set_properties(self, key, value):
-        if key in self.properties:
-            self.properties[key] = value
+    def set_properties(self, **kwargs):
+        for (key, value) in kwargs:
+            if key in self.properties:
+                self.properties[key] = value
 
     def check_move(self, x2, y2):
         board = boards[self.board_id].board
@@ -56,17 +68,20 @@ class Piece:
         if x2 < 0 or x2 > board.w or x2 < 0 or y2 > board.h:
             return None
         
-        if new_cell is not None and new_cell.team == self.properties["team"]:
+        if new_cell is not None and new_cell.team == self.team:
             return None
         
         return [((self.x, self.y),(x2, y2))]
+    
+    def discard(self):
+        boards[self.board_id][self.y][self.x] = None
 
 
 class Pawn(Piece):
     def __init__(self, board_id, team, x, y) -> None:
         super().__init__(board_id, team, x, y)
-        self.properties["moved"] = False
-        self.prperties["double_moved"] = False
+        self.moved = self.properties["moved"] = False
+        self.double_moved = self.properties["double_moved"] = False
 
     def check_move(self, x2, y2):
         self_move = super().check_move(x2, y2)
@@ -80,22 +95,30 @@ class Pawn(Piece):
 
         if dx == 0 and dy in (1, 2) and board[y2 - 1][x2] is None: # straight fd
             if dy == 1: # fd 1 cell
+                if not self.moved: #TODO add promotion
+                    return [self_move, lambda: self.set_properties(moved=True)]
+                if self.double_moved:
+                    return [self_move, lambda: self.set_properties(double_moved=False)]
                 return [self_move]
-            
+
             if dy == 2 and not self.moved and new_cell is None: # fd 2 cells
-                return [self_move, lambda: True]
+                return [self_move, lambda: self.set_properties(moved=True, double_moved=True), ]
             
-            return False
+            return None
 
         if abs(dx) == 1 and dy == 1: # take piece
-            if new_cell is not None: # regular take
-                return True
-            if isinstance(new_cell, Pawn) and new_cell.double_moved: # en passant (https://en.wikipedia.org/wiki/En_passant)  
-                return True
-        return False
-        
+            nearby_cell = board[y2 - 1][x2]
+            if new_cell is not None or (isinstance(nearby_cell, Pawn) and 
+                                        nearby_cell.team != self.team and 
+                                        nearby_cell.double_moved): # regular take or en passant (https://en.wikipedia.org/wiki/En_passant)  
+                if not self.moved:
+                    return [self_move, lambda: new_cell.discard(), lambda: self.set_properties(moved=True)]
+                if self.double_moved:
+                    return [self_move, lambda: new_cell.discard(), lambda: self.set_properties(double_moved=False)]
+                return [self_move, lambda: new_cell.discard()]
+                   
+        return None
 
 
 if __name__ == "__main__":
-    board = Board
-    
+    board = Board()
