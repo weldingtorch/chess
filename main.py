@@ -2,7 +2,47 @@ from types import FunctionType
 
 
 max_id = -1
-boards = []
+boards = [] 
+
+
+def parse_start_pos(fname="./start.pos"):
+    result = dict()
+    parsing_board = False
+    cur_header = None
+    cur_rank = 0
+    pieces = []
+    
+    with open(fname) as f:
+        
+        for line in f.readlines():
+            if line.startswith("//"):
+                continue
+
+            if line.startswith("("):
+                #header
+               cur_header = (board_w, board_h, teams) = (int(x) for x in line.lstrip("(").rstrip(")\n").split(", "))
+            
+            if "{" in line and cur_header is not None and not parsing_board:
+                parsing_board = True
+                
+            
+            if parsing_board:
+                rank = line.strip.split(";")
+                for x in range(cur_header[0]):
+                    (team, type) = rank[x]
+                    pieces.append((x, rank, team, type))
+                
+                rank += 1
+            
+            elif "}" in line and cur_header is not None:
+                parsing_board = False
+                result[cur_header] = pieces
+                cur_header = None
+                board = []
+                continue
+
+
+start_pos = parse_start_pos
 
 
 class Board:
@@ -18,12 +58,7 @@ class Board:
         boards.append(self)
 
     def fill(self):
-        #rkbQKbkr
-        #PPPPPPPP
-        #________ X 4
-        #PPPPPPPP
-        #rkbQKbkr
-        pass
+        
 
     def rotate(self):
         list(map(lambda l: l.reverse(), self.board))
@@ -163,9 +198,23 @@ class Bishop(Piece):
         return None
 
 
-# class Knight(Piece):
-#     def __init__(self, board_id, team, x, y) -> None:
-#         super().__init__(board_id, team, x, y)
+class Knight(Piece):
+    def __init__(self, board_id, team, x, y) -> None:
+        super().__init__(board_id, team, x, y)
+
+    def __repr__(self) -> str:
+       return "k"
+
+    def check_move(self, x2, y2):
+        self_move = super().check_move(x2, y2)
+        if self_move is None:
+            return None
+
+        self_move = self_move[0]
+
+        if abs(x2 - self.x) + abs(y2 - self.y) == 3:
+            pass
+
 
 if __name__ == "__main__":
     board = Board()
